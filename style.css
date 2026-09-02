@@ -1,0 +1,557 @@
+header{
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #70f930 0%, #06f585 50%, #0b8626 100%);
+    padding: 10px 20px;
+}
+main {
+    flex: 1;              /* take up all remaining width next to the sidebar */
+    height: 100vh;        /* fill full viewport height */
+    overflow-y: auto;     /* scroll if content is taller than the screen */
+    box-sizing: border-box;
+}
+.logo{
+    width: 80px;
+}
+.logo img {
+    width:60px;
+    height: auto;
+}
+
+.logged-in img {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;   /* optional: makes it a circle, common for user icons */
+    object-fit: cover;
+}
+.name{
+    text-align: center;
+    flex-grow: 1;
+}
+.title {
+    font-size: 40px;
+    font-weight: bold;
+}
+.slogan {
+    font-size: 16px;
+    text-align: center;
+}
+.logged-in{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+}
+.sidebar {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    background: linear-gradient(135deg, #94b6be 0%, #767591 50%, #504455 100%);
+    width: 200px;
+    box-sizing: border-box;
+}
+.tab {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 50%, #ad1dea 100%);
+    border: none;
+    border-radius: 12px;
+    height: clamp(50px, 8vh, 90px);
+    padding: 12px;
+    font-size: 16px;
+}
+.tab.active {
+    background: linear-gradient(135deg, #fa0bcb 0%, #f93f96 50%, #ea1d50 100%);
+}
+
+.content-wrapper {
+    display: flex;
+    height: 100vh;
+}
+.nav-button {
+  border-radius: 12px;           /* rounded corners */
+  padding: clamp(0.75rem, 2vw, 1.25rem) 1rem;  /* scales with viewport */
+  font-size: clamp(1rem, 2vw, 1.25rem);
+  margin: 4px 8px;               /* small, tight spacing between buttons */
+  width: calc(100% - 16px);      /* account for the margin */
+}
+.nav-container {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;   /* small gap instead of large margins */
+}
+
+
+.auth-box {
+    width: 320px;
+    margin: 100px auto;
+    padding: 20px;
+    border-radius: 12px;
+    background: linear-gradient(135deg, #94b6be 0%, #767591 50%, #504455 100%);
+}
+.auth-tabs {
+    display: flex;
+    margin-bottom: 16px;
+}
+.auth-tab {
+    flex: 1;
+    padding: 10px;
+    border: none;
+    border-radius: 8px;
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 50%, #ad1dea 100%);
+}
+.auth-tab.active {
+    background: linear-gradient(135deg, #fa0bcb 0%, #f93f96 50%, #ea1d50 100%);
+}
+.auth-form {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.auth-form input {
+    padding: 8px;
+    border-radius: 8px;
+    border: none;
+}
+.error {
+    color: red;
+    font-size: 14px;
+}
+
+.auth-form[hidden] {
+    display: none;
+}
+
+/* ---- bigger buttons and text everywhere ---- */
+.tab {
+    font-size: 20px;
+}
+button {
+    font-size: 18px;
+    padding: 12px 20px;
+    border-radius: 10px;
+    border: none;
+    cursor: pointer;
+}
+input {
+    font-size: 16px;
+    padding: 10px;
+    border-radius: 8px;
+}
+
+/* ---- page titles ---- */
+.page-title {
+    font-size: 32px;
+    color: #ad1dea;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.2);
+    border-bottom: 3px solid #0bc3f1;
+    padding-bottom: 8px;
+    margin-bottom: 16px;
+}
+
+/* ---- home page content ---- */
+#home p, #home li {
+    font-size: 18px;
+    line-height: 1.6;
+}
+.home-tip {
+    font-weight: bold;
+    color: #06f585;
+}
+
+/* ---- per-page background gradients on the white area ---- */
+#home {
+    background: linear-gradient(135deg, #fdfbfb 0%, #ebedee 100%);
+}
+#add {
+    background: linear-gradient(135deg, #e0f7fa 0%, #b2ebf2 100%);
+}
+#select {
+    background: linear-gradient(135deg, #fce4ec 0%, #f8bbd0 100%);
+}
+#ai {
+    background: linear-gradient(135deg, #ede7f6 0%, #d1c4e9 100%);
+}
+#parser {
+    background: linear-gradient(135deg, #fff3e0 0%, #ffe0b2 100%);
+}
+#substitute {
+    background: linear-gradient(135deg, #f1f8e9 0%, #dcedc8 100%);
+}
+
+/* since sections are toggled via [hidden], give each page consistent spacing */
+.page {
+    padding: 30px;
+    height: 100%;
+    box-sizing: border-box;
+}
+
+/* ---- Add page: item list styling ---- */
+#item-list {
+    list-style: none;
+    padding: 0;
+}
+#item-list li {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 100%);
+    color: white;
+    font-size: 18px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+#item-list button {
+    background: #ea1d50;
+    color: white;
+    font-size: 14px;
+    padding: 6px 12px;
+}
+
+/* ---- Select page: checkbox + list styling ---- */
+#select-list {
+    list-style: none;
+    padding: 0;
+}
+#select-list li {
+    background: linear-gradient(135deg, #ad1dea 0%, #fa0bcb 100%);
+    color: white;
+    font-size: 18px;
+    padding: 14px 18px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+#select-list input[type="checkbox"] {
+    width: 22px;
+    height: 22px;
+    accent-color: #06f585;
+    cursor: pointer;
+}
+
+/* ---- AI page: recipe suggestion styling ---- */
+#get-recipe-btn {
+    background: linear-gradient(135deg, #fa0bcb 0%, #f93f96 50%, #ea1d50 100%);
+    color: white;
+    margin: 10px 0 20px;
+}
+#get-recipe-btn:disabled {
+    opacity: 0.6;
+    cursor: wait;
+}
+
+.ai-hint, .ai-error {
+    font-size: 16px;
+}
+.ai-error {
+    color: #ea1d50;
+    font-weight: bold;
+}
+.ai-loading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    font-size: 18px;
+    color: #504455;
+}
+.ai-loading .spin {
+    width: 18px;
+    height: 18px;
+    border: 3px solid #d1c4e9;
+    border-top-color: #ad1dea;
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+
+.recipe-card {
+    background: rgba(255,255,255,0.6);
+    border-radius: 14px;
+    padding: 20px 24px;
+    margin-top: 10px;
+}
+.recipe-title {
+    font-size: 26px;
+    font-weight: bold;
+    color: #ad1dea;
+    text-shadow: 1px 1px 2px rgba(0,0,0,0.15);
+    margin-bottom: 6px;
+}
+.recipe-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 14px;
+}
+.recipe-meta span {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 100%);
+    color: white;
+    font-size: 14px;
+    padding: 5px 12px;
+    border-radius: 20px;
+}
+.uses-row {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 16px;
+}
+.uses-row span {
+    background: #06f585;
+    color: #0b3d1c;
+    font-size: 13px;
+    font-weight: bold;
+    padding: 4px 10px;
+    border-radius: 12px;
+}
+.recipe-section-label {
+    font-size: 18px;
+    font-weight: bold;
+    color: #504455;
+    border-bottom: 2px solid #0bc3f1;
+    padding-bottom: 4px;
+    margin: 16px 0 10px;
+}
+.recipe-ingredients {
+    list-style: none;
+    padding: 0;
+}
+.recipe-ingredients li {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 100%);
+    color: white;
+    font-size: 16px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+.recipe-steps {
+    list-style: none;
+    padding: 0;
+    counter-reset: step;
+}
+.recipe-steps li {
+    counter-increment: step;
+    background: linear-gradient(135deg, #ad1dea 0%, #fa0bcb 100%);
+    color: white;
+    font-size: 16px;
+    padding: 12px 16px 12px 44px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    position: relative;
+}
+.recipe-steps li::before {
+    content: counter(step);
+    position: absolute;
+    left: 12px;
+    top: 10px;
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    background: #06f585;
+    color: #0b3d1c;
+    font-size: 13px;
+    font-weight: bold;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+/* =========================================================
+   New additions below — signup validation errors, per-item
+   price tags, grand total, and the interactive prep guide.
+   Nothing above this line was changed.
+   ========================================================= */
+
+/* ---- signup validation error message ---- */
+#signup-error {
+    min-height: 18px;
+}
+
+/* ---- ingredient list: name on the left, estimated price on the right ---- */
+.recipe-ingredients li {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+.ing-price {
+    background: rgba(255,255,255,0.25);
+    padding: 3px 10px;
+    border-radius: 10px;
+    font-size: 13px;
+    font-weight: bold;
+    white-space: nowrap;
+}
+
+/* ---- location note shown above the priced ingredient list ---- */
+.location-note {
+    font-size: 13px;
+    color: #504455;
+    font-style: italic;
+    margin: -4px 0 10px;
+}
+
+/* ---- grand total, shown above the prep guide / procedure ---- */
+.grand-total {
+    background: linear-gradient(135deg, #06f585 0%, #0b8626 100%);
+    color: #0b3d1c;
+    font-size: 20px;
+    font-weight: bold;
+    padding: 12px 18px;
+    border-radius: 10px;
+    margin: 6px 0 4px;
+    display: flex;
+    justify-content: space-between;
+}
+.grand-total span {
+    font-size: 22px;
+}
+
+/* ---- interactive prep guide checklist ---- */
+.prep-guide {
+    list-style: none;
+    padding: 0;
+}
+.prep-guide li {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 100%);
+    color: white;
+    font-size: 16px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+    transition: opacity 0.2s ease;
+}
+.prep-guide li.prep-done {
+    opacity: 0.55;
+}
+.prep-guide label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.prep-guide input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #06f585;
+    cursor: pointer;
+}
+.prep-guide li.prep-done .prep-task-text {
+    text-decoration: line-through;
+}
+
+/* ---- sidebar now holds 7 tabs — let it scroll on short screens ---- */
+.sidebar {
+    overflow-y: auto;
+}
+
+/* ---- Recipe Parser Engine ---- */
+#parser-input {
+    width: 100%;
+    box-sizing: border-box;
+    font-family: inherit;
+    resize: vertical;
+    border-radius: 8px;
+    border: none;
+    margin-bottom: 10px;
+}
+#parse-btn {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 100%);
+    color: white;
+    margin-bottom: 16px;
+}
+.parsed-ingredients {
+    list-style: none;
+    padding: 0;
+}
+.parsed-ingredients li {
+    background: linear-gradient(135deg, #06f585 0%, #0b8626 100%);
+    color: #0b3d1c;
+    font-size: 16px;
+    padding: 10px 16px;
+    margin-bottom: 8px;
+    border-radius: 10px;
+}
+.parsed-ingredients label {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    cursor: pointer;
+}
+.parsed-ingredients input[type="checkbox"] {
+    width: 20px;
+    height: 20px;
+    accent-color: #0b3d1c;
+    cursor: pointer;
+}
+#add-parsed-btn {
+    background: linear-gradient(135deg, #fa0bcb 0%, #f93f96 50%, #ea1d50 100%);
+    color: white;
+    margin: 6px 0 20px;
+}
+#add-parsed-btn:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+/* ---- AI Substitution Matrix ---- */
+.sub-input-row {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 16px;
+    flex-wrap: wrap;
+}
+.sub-input-row input {
+    flex: 1;
+    min-width: 200px;
+}
+#sub-find-btn {
+    background: linear-gradient(135deg, #fa0bcb 0%, #f93f96 50%, #ea1d50 100%);
+    color: white;
+}
+.sub-matrix {
+    list-style: none;
+    padding: 0;
+}
+.sub-matrix li {
+    background: linear-gradient(135deg, #0bc3f1 0%, #1a0fea 100%);
+    color: white;
+    padding: 12px 16px;
+    margin-bottom: 10px;
+    border-radius: 10px;
+}
+.sub-matrix li.sub-have {
+    background: linear-gradient(135deg, #06f585 0%, #0b8626 100%);
+    color: #0b3d1c;
+}
+.sub-name-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    gap: 10px;
+}
+.sub-name {
+    font-weight: bold;
+    font-size: 16px;
+}
+.sub-badge {
+    font-size: 12px;
+    padding: 3px 10px;
+    border-radius: 12px;
+    white-space: nowrap;
+}
+.sub-badge-yes {
+    background: #0b3d1c;
+    color: #06f585;
+}
+.sub-badge-no {
+    background: rgba(0,0,0,0.25);
+    color: white;
+}
+.sub-note {
+    font-size: 13px;
+    margin-top: 4px;
+    opacity: 0.9;
+}

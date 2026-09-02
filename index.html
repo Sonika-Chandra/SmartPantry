@@ -1,0 +1,729 @@
+<html>
+    <head>
+        <link rel="stylesheet" href="style.css">
+        <title>SmartPantry</title>
+    </head>
+    <body>
+        <header>
+            <div class="logo"><img src="logo.png" alt="Logo"></div>
+            <div class="name">
+                <div class="t itle">What's Left in the Kitchen</div>
+                <div class="slogan">-Saving thae best for last</div>
+            </div>
+            <div class="logged-in"><img src="icon.png" alt="User-icon"><br><span><i id="username-display">username</i></span></div>
+        </header>
+        <div class="content-wrapper">
+            <nav class="sidebar">
+                <div class="nav-container">
+                    <button class="tab active nav-button">Home</button>
+                    <button class="tab nav-button">Add</button>
+                    <button class="tab nav-button">Parser</button>
+                    <button class="tab nav-button">Select</button>
+                    <button class="tab nav-button">Substitute</button>
+                    <button class="tab nav-button">AI</button>
+                    <button class="tab nav-button">Logout</button>
+                </div>
+            </nav>
+            <main>
+                <section id="home" class="page">
+                    <h2 class="page-title">Welcome to SmartPantry</h2>
+                    <p>SmartPantry helps you keep track of what's in your kitchen, decide what to use, and get smart suggestions on what to cook or buy next.</p>
+                    <p>Here's how to use this site:</p>
+                    <ul class="home-list">
+                        <li><b>Add</b> – enter an item's name and quantity to add it to your pantry list. You can delete individual items or clear the whole list at once.</li>
+                        <li><b>Select</b> – tick the checkboxes next to items you want to use, then hit Confirm to send them onward to AI. Deselect All clears every checkbox in one click.</li>
+                        <li><b>AI</b> – based on whatever you selected, this page will suggest recipes, substitutes, or what to restock.</li>
+                        <li><b>Logout</b> – securely sign out and return to the login page.</li>
+                    </ul>
+                    <p class="home-tip">Tip: keep your pantry list updated after every grocery run so AI suggestions stay accurate.</p>
+                </section>
+
+                <section id="add" class="page" hidden>
+                    <h2 class="page-title">Add Items</h2>
+                    <form id="add-form">
+                        <input type="text" id="item-name" placeholder="Item name" required>
+                        <input type="text" id="item-qty" placeholder="Quantity" min="1" required>
+                        <button type="submit">Add Item</button>
+                    </form>
+                    <button id="clear-all-btn">Clear All</button>
+                    <ul id="item-list"></ul>
+                </section>
+
+                <section id="parser" class="page" hidden>
+                    <h2 class="page-title">Recipe Parser Engine</h2>
+                    <p>Paste the full HTML source of a food blog's recipe page below (right-click the page → "View Page Source" → copy all → paste here). The engine first looks for the page's structured recipe data, and falls back to scanning the raw markup for ingredient/instruction sections if the blog doesn't provide it.</p>
+                    <textarea id="parser-input" rows="8" placeholder="Paste recipe page HTML here..."></textarea>
+                    <button id="parse-btn">Parse Recipe</button>
+                    <div id="parser-result"></div>
+                </section>
+
+                <section id="select" class="page" hidden>
+                    <h2 class="page-title">Select Items</h2>
+                    <ul id="select-list"></ul>
+                    <button id="confirm-btn">Confirm</button>
+                    <button id="deselect-btn">Deselect All</button>
+                </section>
+
+                <section id="substitute" class="page" hidden>
+                    <h2 class="page-title">AI Substitution Matrix</h2>
+                    <p>Missing an ingredient? Enter it below — the AI will suggest common substitutes and flag any you already have in your pantry.</p>
+                    <div class="sub-input-row">
+                        <input type="text" id="sub-ingredient-input" placeholder="e.g. buttermilk, egg, breadcrumbs">
+                        <button id="sub-find-btn">Find Substitutes</button>
+                    </div>
+                    <div id="sub-result"></div>
+                </section>
+
+                <section id="ai" class="page" hidden>
+                    <h2 class="page-title">AI Suggestions</h2>
+                    <p>Selected items:</p>
+                    <ul id="ai-selected-list"></ul>
+                    <button id="get-recipe-btn">Get Recipe Suggestion</button>
+                    <div id="ai-result"></div>
+                </section>
+
+                <section id="logout" class="page" hidden></section>
+            </main>
+        </div>
+
+        <script>
+            // ⚠️ For personal / local use only. Do not upload this file anywhere public —
+            // this key will be visible to anyone who opens the file.
+            const GEMINI_API_KEY = "AQ.Ab8RN6KjPdHg_yLD7TuNWLvl09ah_7djv-WtDq31-cU6472OiA";
+            const GEMINI_MODEL = "gemini-3.6-flash";
+
+            // ---- guard: redirect to login if not signed in ----
+            if (!localStorage.getItem('currentUser')) {
+                window.location.href = 'login.html';
+            } else {
+                const currentUser = JSON.parse(localStorage.getItem('currentUser'));
+                document.getElementById('username-display').textContent = currentUser.usn;
+
+                // ---- per-USN pantry storage helpers ----
+                function pantryStorageKey() {
+                    return 'pantry_' + currentUser.usn;
+                }
+                function loadPantry() {
+                    try {
+                        return JSON.parse(localStorage.getItem(pantryStorageKey()) || '[]');
+                    } catch {
+                        return [];
+                    }
+                }
+                function savePantry() {
+                    localStorage.setItem(pantryStorageKey(), JSON.stringify(pantryItems));
+                }
+
+                // ---- shared state (loaded per logged-in USN) ----
+                let pantryItems = loadPantry(); // { id, name, qty, selected }
+                let nextId = pantryItems.reduce((max, i) => Math.max(max, i.id), 0) + 1;
+
+                const tabs = document.querySelectorAll('.tab');
+                const pages = document.querySelectorAll('.page');
+
+                // ---- single source of truth for switching pages ----
+                function switchToPage(pageId) {
+                    tabs.forEach(t => t.classList.remove('active'));
+                    tabs.forEach(t => {
+                        if (t.textContent.trim().toLowerCase() === pageId) {
+                            t.classList.add('active');
+                        }
+                    });
+                    pages.forEach(page => { page.hidden = page.id !== pageId; });
+
+                    if (pageId === 'add') renderItemList();
+                    if (pageId === 'select') renderSelectList();
+                    if (pageId === 'ai') renderAiSelected();
+                }
+
+                tabs.forEach(function (tab) {
+                    tab.addEventListener('click', function () {
+                        const targetId = tab.textContent.trim().toLowerCase();
+
+                        if (targetId === 'logout') {
+                            localStorage.removeItem('currentUser');
+                            window.location.href = 'login.html';
+                            return;
+                        }
+
+                        switchToPage(targetId);
+                    });
+                });
+
+                // ---- Add page ----
+                const addForm = document.getElementById('add-form');
+                const itemList = document.getElementById('item-list');
+                const clearAllBtn = document.getElementById('clear-all-btn');
+
+                addForm.addEventListener('submit', function (e) {
+                    e.preventDefault();
+
+                    const nameInput = document.getElementById('item-name');
+                    const qtyInput = document.getElementById('item-qty');
+
+                    pantryItems.push({
+                        id: nextId++,
+                        name: nameInput.value,
+                        qty: qtyInput.value,
+                        selected: false
+                    });
+
+                    nameInput.value = '';
+                    qtyInput.value = '';
+                    savePantry();
+                    renderItemList();
+                });
+
+                clearAllBtn.addEventListener('click', function () {
+                    pantryItems = [];
+                    savePantry();
+                    renderItemList();
+                });
+
+                function renderItemList() {
+                    itemList.innerHTML = '';
+                    pantryItems.forEach(function (item) {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.name} - ${item.qty} `;
+
+                        const deleteBtn = document.createElement('button');
+                        deleteBtn.textContent = 'Delete';
+                        deleteBtn.addEventListener('click', function () {
+                            pantryItems = pantryItems.filter(i => i.id !== item.id);
+                            savePantry();
+                            renderItemList();
+                        });
+
+                        li.appendChild(deleteBtn);
+                        itemList.appendChild(li);
+                    });
+                }
+
+                // ---- Recipe Parser Engine ----
+                // Runs entirely in the browser on HTML you paste in (no network fetch —
+                // arbitrary cross-origin blog pages can't be fetched client-side due to
+                // CORS, so this avoids that limitation entirely).
+                const parserInput = document.getElementById('parser-input');
+                const parseBtn = document.getElementById('parse-btn');
+                const parserResult = document.getElementById('parser-result');
+
+                parseBtn.addEventListener('click', function () {
+                    const html = parserInput.value.trim();
+                    if (!html) {
+                        parserResult.innerHTML = `<p class="ai-error">Paste some page HTML first.</p>`;
+                        return;
+                    }
+
+                    let recipe = null;
+                    try {
+                        recipe = extractFromJsonLd(html) || extractByHeuristics(html);
+                    } catch {
+                        recipe = null;
+                    }
+
+                    if (!recipe || (!recipe.ingredients.length && !recipe.steps.length)) {
+                        parserResult.innerHTML = `<p class="ai-error">Couldn't find a recognizable recipe in that page. Try pasting the full page source (Ctrl/Cmd+U or "View Page Source"), not just the visible text.</p>`;
+                        return;
+                    }
+
+                    renderParsedRecipe(recipe);
+                });
+
+                // Attempt 1: look for schema.org JSON-LD Recipe markup — this is how most
+                // real recipe blogs mark themselves up for Google/Pinterest, and how
+                // production recipe parsers/scrapers actually work under the hood.
+                function extractFromJsonLd(html) {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+                    const scripts = doc.querySelectorAll('script[type="application/ld+json"]');
+
+                    for (const script of scripts) {
+                        let data;
+                        try {
+                            data = JSON.parse(script.textContent);
+                        } catch {
+                            continue;
+                        }
+
+                        const nodes = flattenJsonLd(data);
+                        const recipeNode = nodes.find(function (node) {
+                            const type = node['@type'];
+                            return type === 'Recipe' || (Array.isArray(type) && type.includes('Recipe'));
+                        });
+
+                        if (recipeNode) {
+                            return {
+                                title: recipeNode.name || 'Parsed Recipe',
+                                servings: recipeNode.recipeYield ? String(recipeNode.recipeYield) : '',
+                                ingredients: (recipeNode.recipeIngredient || []).map(String),
+                                steps: extractInstructions(recipeNode.recipeInstructions),
+                                source: 'structured data (JSON-LD)'
+                            };
+                        }
+                    }
+                    return null;
+                }
+
+                // JSON-LD can nest the Recipe inside @graph, or the root can be an array
+                // of objects — flatten everything into one list so we can search it.
+                function flattenJsonLd(data) {
+                    const list = [];
+                    function walk(node) {
+                        if (!node) return;
+                        if (Array.isArray(node)) {
+                            node.forEach(walk);
+                        } else if (typeof node === 'object') {
+                            list.push(node);
+                            if (node['@graph']) walk(node['@graph']);
+                        }
+                    }
+                    walk(data);
+                    return list;
+                }
+
+                function extractInstructions(instructions) {
+                    if (!instructions) return [];
+                    if (typeof instructions === 'string') {
+                        return instructions.split(/\n+/).map(s => s.trim()).filter(Boolean);
+                    }
+                    if (Array.isArray(instructions)) {
+                        return instructions.map(function (step) {
+                            if (typeof step === 'string') return step;
+                            if (step.text) return step.text;
+                            if (step.itemListElement) return extractInstructions(step.itemListElement).join(' ');
+                            return '';
+                        }).filter(Boolean);
+                    }
+                    return [];
+                }
+
+                // Attempt 2 (fallback): no JSON-LD present — scan the raw HTML for
+                // elements whose class/id names hint at ingredients or instructions,
+                // which is how most older or messier food blogs structure their markup.
+                function extractByHeuristics(html) {
+                    const doc = new DOMParser().parseFromString(html, 'text/html');
+
+                    const titleEl = doc.querySelector('h1') || doc.querySelector('title');
+                    const title = titleEl ? titleEl.textContent.trim() : 'Parsed Recipe';
+
+                    const ingredientKeywords = /ingredient/i;
+                    const stepKeywords = /(instruction|direction|method|step)/i;
+
+                    return {
+                        title: title,
+                        servings: '',
+                        ingredients: collectListItemsNear(doc, ingredientKeywords),
+                        steps: collectListItemsNear(doc, stepKeywords),
+                        source: 'heuristic scan'
+                    };
+                }
+
+                function collectListItemsNear(doc, keywordRegex) {
+                    const items = [];
+                    const all = doc.querySelectorAll('[class], [id]');
+                    all.forEach(function (el) {
+                        const hint = `${el.className} ${el.id}`;
+                        if (keywordRegex.test(hint)) {
+                            el.querySelectorAll('li').forEach(function (li) {
+                                const text = li.textContent.replace(/\s+/g, ' ').trim();
+                                if (text) items.push(text);
+                            });
+                        }
+                    });
+                    return [...new Set(items)]; // de-duplicate, keep order
+                }
+
+                function renderParsedRecipe(recipe) {
+                    const ingredientsHtml = recipe.ingredients
+                        .map((ing, idx) => `
+                            <li>
+                                <label>
+                                    <input type="checkbox" class="parsed-ing-check" data-idx="${idx}" checked>
+                                    <span>${escapeHtml(ing)}</span>
+                                </label>
+                            </li>`)
+                        .join('');
+                    const stepsHtml = recipe.steps.map(s => `<li>${escapeHtml(s)}</li>`).join('');
+
+                    parserResult.innerHTML = `
+                        <div class="recipe-card">
+                            <div class="recipe-title">${escapeHtml(recipe.title)}</div>
+                            <p class="location-note">Extracted via ${escapeHtml(recipe.source)}${recipe.servings ? ` &middot; serves ${escapeHtml(recipe.servings)}` : ''}</p>
+
+                            <div class="recipe-section-label">Ingredients Found</div>
+                            <ul class="parsed-ingredients">${ingredientsHtml || '<li>None found</li>'}</ul>
+                            <button id="add-parsed-btn" ${recipe.ingredients.length ? '' : 'disabled'}>Add Checked Ingredients to Pantry</button>
+
+                            <div class="recipe-section-label">Steps Found</div>
+                            <ol class="recipe-steps">${stepsHtml || '<li>None found</li>'}</ol>
+                        </div>
+                    `;
+
+                    const addParsedBtn = document.getElementById('add-parsed-btn');
+                    if (addParsedBtn) {
+                        addParsedBtn.addEventListener('click', function () {
+                            const checked = document.querySelectorAll('.parsed-ing-check:checked');
+                            checked.forEach(function (box) {
+                                const idx = Number(box.dataset.idx);
+                                const { name, qty } = splitIngredientText(recipe.ingredients[idx]);
+                                pantryItems.push({ id: nextId++, name: name, qty: qty, selected: false });
+                            });
+                            savePantry();
+                            addParsedBtn.textContent = 'Added!';
+                            addParsedBtn.disabled = true;
+                        });
+                    }
+                }
+
+                // Best-effort split of e.g. "2 cups flour" into { qty: "2 cups", name: "flour" }.
+                function splitIngredientText(text) {
+                    const match = text.match(/^([\d¼½¾⅓⅔.\/\s]+(?:[a-zA-Z]+\.?)?)\s+(.*)$/);
+                    if (match && match[2]) {
+                        return { qty: match[1].trim(), name: match[2].trim() };
+                    }
+                    return { qty: '1', name: text.trim() };
+                }
+
+                // ---- Select page ----
+                const selectList = document.getElementById('select-list');
+                const confirmBtn = document.getElementById('confirm-btn');
+                const deselectBtn = document.getElementById('deselect-btn');
+
+                function renderSelectList() {
+                    selectList.innerHTML = '';
+                    pantryItems.forEach(function (item) {
+                        const li = document.createElement('li');
+
+                        const checkbox = document.createElement('input');
+                        checkbox.type = 'checkbox';
+                        checkbox.checked = item.selected;
+                        checkbox.addEventListener('change', function () {
+                            item.selected = checkbox.checked;
+                            savePantry();
+                        });
+
+                        li.appendChild(checkbox);
+                        li.appendChild(document.createTextNode(`${item.name} - ${item.qty}`));
+                        selectList.appendChild(li);
+                    });
+                }
+
+                confirmBtn.addEventListener('click', function () {
+                    switchToPage('ai');
+                });
+
+                deselectBtn.addEventListener('click', function () {
+                    pantryItems.forEach(item => item.selected = false);
+                    savePantry();
+                    renderSelectList();
+                });
+
+                // ---- AI page ----
+                const aiSelectedList = document.getElementById('ai-selected-list');
+                const getRecipeBtn = document.getElementById('get-recipe-btn');
+                const aiResult = document.getElementById('ai-result');
+
+                function renderAiSelected() {
+                    aiSelectedList.innerHTML = '';
+                    pantryItems.filter(i => i.selected).forEach(function (item) {
+                        const li = document.createElement('li');
+                        li.textContent = `${item.name} - ${item.qty}`;
+                        aiSelectedList.appendChild(li);
+                    });
+                    // reset the result panel whenever the selection changes underneath it
+                    aiResult.innerHTML = '';
+                }
+
+                getRecipeBtn.addEventListener('click', fetchRecipeSuggestion);
+
+                // ---- geo-localised price optimiser helper ----
+                // Requests the device location. Resolves { lat, lng } on success,
+                // or null if permission is denied / unavailable / times out.
+                function getDeviceLocation() {
+                    return new Promise(function (resolve) {
+                        if (!('geolocation' in navigator)) {
+                            resolve(null);
+                            return;
+                        }
+                        navigator.geolocation.getCurrentPosition(
+                            function (pos) {
+                                resolve({
+                                    lat: pos.coords.latitude,
+                                    lng: pos.coords.longitude
+                                });
+                            },
+                            function () {
+                                resolve(null); // denied or failed — fall back to rough estimate
+                            },
+                            { enableHighAccuracy: false, timeout: 8000, maximumAge: 0 }
+                        );
+                    });
+                }
+
+                async function fetchRecipeSuggestion() {
+                    const selectedItems = pantryItems.filter(i => i.selected);
+
+                    if (!GEMINI_API_KEY || GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
+                        aiResult.innerHTML = `<p class="ai-error">No API key set. Open index.html and paste your key into GEMINI_API_KEY.</p>`;
+                        return;
+                    }
+                    if (selectedItems.length === 0) {
+                        aiResult.innerHTML = `<p class="ai-error">Go to Select and tick a few items first.</p>`;
+                        return;
+                    }
+
+                    // Fire the location permission prompt immediately on click.
+                    getRecipeBtn.disabled = true;
+                    aiResult.innerHTML = `
+                        <div class="ai-loading">
+                            <span class="spin"></span>
+                            <span>Requesting your location for price estimates...</span>
+                        </div>`;
+
+                    const location = await getDeviceLocation();
+
+                    aiResult.innerHTML = `
+                        <div class="ai-loading">
+                            <span class="spin"></span>
+                            <span>Asking the AI what to cook...</span>
+                        </div>`;
+
+                    const ingredientText = selectedItems
+                        .map(i => `${i.name} (qty: ${i.qty})`)
+                        .join(", ");
+
+                    const locationText = location
+                        ? `The device's approximate coordinates are latitude ${location.lat.toFixed(4)}, longitude ${location.lng.toFixed(4)}. Use this to inform realistic local Indian market prices near this location where possible.`
+                        : `Device location is not available. Give a rough, reasonable nationwide-average Indian market price estimate instead.`;
+
+                    const prompt = `I have these pantry items available: ${ingredientText}.
+Suggest ONE simple recipe I can make mainly using these (a few common basics like salt, oil, water are fine to assume). Prefer using as many of the listed items as makes sense — don't force in ones that don't fit. You may add a few extra ingredients not in my pantry if the recipe needs them.
+
+${locationText}
+For every ingredient in the final ingredients list — both the ones from my pantry and any extra ones you add — estimate the price in Indian Rupees (INR) for the quantity/amount used in this recipe. Prices must be plain numbers in INR only (no other currency, no symbols in the JSON values).
+
+Also provide a short interactive prep guide: a list of quick mise-en-place tasks to do BEFORE cooking (e.g. washing, chopping, measuring, marinating), separate from the numbered cooking steps.
+
+Respond ONLY with valid JSON (no markdown, no backticks) in exactly this shape:
+{
+  "title": "Dish Name",
+  "usesItems": ["item used 1", "item used 2"],
+  "servings": "e.g. 2",
+  "prepTime": "e.g. 10 mins",
+  "cookTime": "e.g. 15 mins",
+  "ingredients": [
+    { "name": "ingredient name with quantity", "estPriceINR": 0 }
+  ],
+  "prepGuide": ["prep task 1", "prep task 2"],
+  "steps": ["step 1", "step 2"]
+}`;
+
+                    try {
+                        const response = await fetch(
+                            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({
+                                    contents: [{ parts: [{ text: prompt }] }]
+                                })
+                            }
+                        );
+
+                        if (!response.ok) {
+                            const errData = await response.json().catch(() => null);
+                            throw new Error(errData?.error?.message || `Request failed (status ${response.status})`);
+                        }
+
+                        const data = await response.json();
+                        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                        const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+                        let recipe;
+                        try {
+                            recipe = JSON.parse(cleaned);
+                        } catch {
+                            throw new Error("Couldn't understand the AI's response. Try again.");
+                        }
+
+                        renderRecipe(recipe, !!location);
+
+                    } catch (err) {
+                        aiResult.innerHTML = `<p class="ai-error">${err.message}</p>`;
+                    } finally {
+                        getRecipeBtn.disabled = false;
+                    }
+                }
+
+                function renderRecipe(recipe, usedLocation) {
+                    const ingredients = (recipe.ingredients || []).map(function (ing) {
+                        if (typeof ing === 'string') {
+                            return { name: ing, estPriceINR: 0 };
+                        }
+                        return {
+                            name: ing.name || 'Ingredient',
+                            estPriceINR: Number(ing.estPriceINR) || 0
+                        };
+                    });
+
+                    const grandTotal = ingredients.reduce((sum, i) => sum + i.estPriceINR, 0);
+
+                    const ingredientsHtml = ingredients
+                        .map(i => `<li><span>${escapeHtml(i.name)}</span><span class="ing-price">Est: ₹${i.estPriceINR}</span></li>`)
+                        .join("");
+                    const prepGuideHtml = (recipe.prepGuide || [])
+                        .map((task, idx) => `
+                            <li>
+                                <label>
+                                    <input type="checkbox" class="prep-check" data-idx="${idx}">
+                                    <span class="prep-task-text">${escapeHtml(task)}</span>
+                                </label>
+                            </li>`)
+                        .join("");
+                    const stepsHtml = (recipe.steps || [])
+                        .map(s => `<li>${escapeHtml(s)}</li>`).join("");
+                    const usesHtml = (recipe.usesItems || [])
+                        .map(i => `<span>${escapeHtml(i)}</span>`).join("");
+
+                    aiResult.innerHTML = `
+                        <div class="recipe-card">
+                            <div class="recipe-title">${escapeHtml(recipe.title || "Suggested Recipe")}</div>
+                            <div class="recipe-meta">
+                                ${recipe.servings ? `<span>Serves ${escapeHtml(recipe.servings)}</span>` : ""}
+                                ${recipe.prepTime ? `<span>Prep ${escapeHtml(recipe.prepTime)}</span>` : ""}
+                                ${recipe.cookTime ? `<span>Cook ${escapeHtml(recipe.cookTime)}</span>` : ""}
+                            </div>
+                            ${usesHtml ? `<div class="uses-row">${usesHtml}</div>` : ""}
+
+                            <div class="recipe-section-label">Ingredients &amp; Estimated Prices</div>
+                            <p class="location-note">${usedLocation ? "Prices estimated using your approximate device location." : "Location unavailable — showing rough nationwide estimates."}</p>
+                            <ul class="recipe-ingredients">${ingredientsHtml || "<li>Not provided</li>"}</ul>
+
+                            <div class="grand-total">Grand Total: <span>₹${grandTotal}</span></div>
+
+                            <div class="recipe-section-label">Prep Guide</div>
+                            <ul class="prep-guide" id="prep-guide-list">${prepGuideHtml || "<li>Not provided</li>"}</ul>
+
+                            <div class="recipe-section-label">Steps</div>
+                            <ol class="recipe-steps">${stepsHtml || "<li>Not provided</li>"}</ol>
+                        </div>
+                    `;
+
+                    attachPrepGuideHandlers();
+                }
+
+                function attachPrepGuideHandlers() {
+                    document.querySelectorAll('.prep-check').forEach(function (box) {
+                        box.addEventListener('change', function () {
+                            const li = box.closest('li');
+                            li.classList.toggle('prep-done', box.checked);
+                        });
+                    });
+                }
+
+                // ---- AI Substitution Matrix ----
+                // Asks the same Gemini model for common substitutes for a given
+                // ingredient, then cross-checks the suggestions against what's
+                // already sitting in the user's pantry.
+                const subInput = document.getElementById('sub-ingredient-input');
+                const subFindBtn = document.getElementById('sub-find-btn');
+                const subResult = document.getElementById('sub-result');
+
+                subFindBtn.addEventListener('click', findSubstitutes);
+
+                async function findSubstitutes() {
+                    const ingredient = subInput.value.trim();
+                    if (!ingredient) {
+                        subResult.innerHTML = `<p class="ai-error">Type an ingredient first.</p>`;
+                        return;
+                    }
+                    if (!GEMINI_API_KEY || GEMINI_API_KEY === "PASTE_YOUR_GEMINI_API_KEY_HERE") {
+                        subResult.innerHTML = `<p class="ai-error">No API key set. Open index.html and paste your key into GEMINI_API_KEY.</p>`;
+                        return;
+                    }
+
+                    subFindBtn.disabled = true;
+                    subResult.innerHTML = `
+                        <div class="ai-loading">
+                            <span class="spin"></span>
+                            <span>Matching substitutes against your pantry...</span>
+                        </div>`;
+
+                    const pantryNames = pantryItems.map(i => i.name).join(', ') || 'nothing currently in the pantry';
+
+                    const prompt = `I need a substitute for this ingredient: "${ingredient}".
+My current pantry contains: ${pantryNames}.
+
+List 3 to 5 common cooking substitutes for "${ingredient}", ordered from best to worst substitute. For each one, state whether it matches something already in my pantry list above (match loosely on the ingredient name, ignore quantities).
+
+Respond ONLY with valid JSON (no markdown, no backticks) in exactly this shape:
+{
+  "ingredient": "${ingredient}",
+  "substitutes": [
+    { "name": "substitute name", "note": "short note, e.g. ratio or how it changes the dish", "inPantry": true }
+  ]
+}`;
+
+                    try {
+                        const response = await fetch(
+                            `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`,
+                            {
+                                method: "POST",
+                                headers: { "Content-Type": "application/json" },
+                                body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                            }
+                        );
+
+                        if (!response.ok) {
+                            const errData = await response.json().catch(() => null);
+                            throw new Error(errData?.error?.message || `Request failed (status ${response.status})`);
+                        }
+
+                        const data = await response.json();
+                        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || "";
+                        const cleaned = rawText.replace(/```json/g, "").replace(/```/g, "").trim();
+
+                        let result;
+                        try {
+                            result = JSON.parse(cleaned);
+                        } catch {
+                            throw new Error("Couldn't understand the AI's response. Try again.");
+                        }
+
+                        renderSubstitutes(result);
+
+                    } catch (err) {
+                        subResult.innerHTML = `<p class="ai-error">${err.message}</p>`;
+                    } finally {
+                        subFindBtn.disabled = false;
+                    }
+                }
+
+                function renderSubstitutes(result) {
+                    const rows = (result.substitutes || []).map(function (sub) {
+                        return `
+                            <li class="${sub.inPantry ? 'sub-have' : ''}">
+                                <div class="sub-name-row">
+                                    <span class="sub-name">${escapeHtml(sub.name || '')}</span>
+                                    <span class="sub-badge ${sub.inPantry ? 'sub-badge-yes' : 'sub-badge-no'}">${sub.inPantry ? 'You have this' : 'Not in pantry'}</span>
+                                </div>
+                                ${sub.note ? `<div class="sub-note">${escapeHtml(sub.note)}</div>` : ''}
+                            </li>`;
+                    }).join('');
+
+                    subResult.innerHTML = `
+                        <div class="recipe-card">
+                            <div class="recipe-title">Substitutes for ${escapeHtml(result.ingredient || '')}</div>
+                            <ul class="sub-matrix">${rows || '<li>No substitutes found</li>'}</ul>
+                        </div>
+                    `;
+                }
+
+                function escapeHtml(str) {
+                    const div = document.createElement('div');
+                    div.textContent = str;
+                    return div.innerHTML;
+                }
+            }
+        </script>
+    </body>
+</html>

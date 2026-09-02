@@ -1,0 +1,179 @@
+<html>
+<head>
+    <link rel="stylesheet" href="style.css">
+    <style>
+        body {
+    background: linear-gradient(135deg, #0be2f1 0%, #08c3f1 50%, #0c32ed 100%);
+    min-height: 100vh;
+    margin: 0;
+    }
+    </style>
+    
+</head>
+<body class="login-page">
+    <div class="auth-box">
+        <div class="auth-tabs">
+            <button id="login-tab" class="auth-tab active">Login</button>
+            <button id="signup-tab" class="auth-tab">Signup</button>
+        </div>
+
+        <form id="login-form" class="auth-form">
+            <input type="text" id="login-usn" placeholder="USN" required>
+            <input type="password" id="login-password" placeholder="Password" required>
+            <button type="submit">Login</button>
+        </form>
+
+        <form id="signup-form" class="auth-form" hidden>
+            <input type="text" id="signup-name" placeholder="Name" required>
+            <input type="email" id="signup-email" placeholder="Email" required>
+            <input type="tel" id="signup-phone" placeholder="Phone No." required>
+            <input type="text" id="signup-usn" placeholder="USN" required>
+            <input type="password" id="signup-password" placeholder="Password" required>
+            <div class="error" id="signup-error"></div>
+            <button type="submit">Signup</button>
+        </form>
+    </div>
+
+    <script>
+        const loginTab = document.getElementById('login-tab');
+        const signupTab = document.getElementById('signup-tab');
+        const loginForm = document.getElementById('login-form');
+        const signupForm = document.getElementById('signup-form');
+        const signupError = document.getElementById('signup-error');
+
+        function showLogin() {
+            loginTab.classList.add('active');
+            signupTab.classList.remove('active');
+            loginForm.hidden = false;
+            signupForm.hidden = true;
+        }
+
+        function showSignup() {
+            signupTab.classList.add('active');
+            loginTab.classList.remove('active');
+            signupForm.hidden = false;
+            loginForm.hidden = true;
+        }
+
+        loginTab.addEventListener('click', showLogin);
+        signupTab.addEventListener('click', showSignup);
+
+        function getUsers() {
+            return JSON.parse(localStorage.getItem('users') || '[]');
+        }
+        function saveUsers(users) {
+            localStorage.setItem('users', JSON.stringify(users));
+        }
+
+        // ---- signup field restrictions ----
+        // email: must end in @gmail.com
+        // phone: starts with 6-9, 10 digits total
+        // USN: minimum 4 characters, and must be unique across all signed-up users
+        // password: minimum 6 characters, at least 1 special char, at least 2 digits, at least 3 letters
+        function validateSignup(name, email, phone, usn, password, users) {
+            const emailRegex = /^[^\s@]+@gmail\.com$/i;
+            const phoneRegex = /^[6-9]\d{9}$/;
+
+            if (!name.trim()) {
+                return 'Please enter your name.';
+            }
+            if (!emailRegex.test(email.trim())) {
+                return 'Email must be a valid @gmail.com address.';
+            }
+            if (!phoneRegex.test(phone.trim())) {
+                return 'Phone number must be 10 digits and start with 6, 7, 8, or 9.';
+            }
+            if (usn.trim().length < 4) {
+                return 'USN must be at least 4 characters long.';
+            }
+            if (users.some(u => u.usn === usn.trim())) {
+                return 'That USN is already taken. Please choose another.';
+            }
+
+            const specialCharCount = (password.match(/[^A-Za-z0-9]/g) || []).length;
+            const digitCount = (password.match(/\d/g) || []).length;
+            const letterCount = (password.match(/[A-Za-z]/g) || []).length;
+
+            if (password.length < 6) {
+                return 'Password must be at least 6 characters long.';
+            }
+            if (specialCharCount < 1) {
+                return 'Password must contain at least 1 special character.';
+            }
+            if (digitCount < 2) {
+                return 'Password must contain at least 2 digits.';
+            }
+            if (letterCount < 3) {
+                return 'Password must contain at least 3 letters.';
+            }
+
+            return null; // no errors
+        }
+
+        // ---- signup ----
+        signupForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const phone = document.getElementById('signup-phone').value;
+            const usn = document.getElementById('signup-usn').value;
+            const password = document.getElementById('signup-password').value;
+
+            const users = getUsers();
+            const errorMsg = validateSignup(name, email, phone, usn, password, users);
+
+            if (errorMsg) {
+                signupError.textContent = errorMsg;
+                return;
+            }
+            signupError.textContent = '';
+
+            const newUser = {
+                name: name,
+                email: email,
+                phone: phone,
+                usn: usn.trim(),
+                password: password
+            };
+
+            users.push(newUser);
+            saveUsers(users);
+
+            signupForm.reset();
+            showLogin();
+        });
+
+        // ---- login ----
+        loginForm.addEventListener('submit', function (e) {
+            e.preventDefault();
+
+            const usnInput = document.getElementById('login-usn');
+            const passwordInput = document.getElementById('login-password');
+            const usn = usnInput.value;
+            const password = passwordInput.value;
+            const users = getUsers();
+
+            const userByUsn = users.find(u => u.usn === usn);
+
+            if (!userByUsn) {
+                alert('Username does not exist. Please signup.');
+                // this line only runs after the user clicks OK on the alert
+                loginForm.reset();
+                showSignup();
+                return;
+            }
+
+            if (userByUsn.password !== password) {
+                alert('Incorrect password. Try again.');
+                usnInput.value = '';
+                passwordInput.value = '';
+                return;
+            }
+
+            localStorage.setItem('currentUser', JSON.stringify(userByUsn));
+            window.location.href = 'index.html';
+        });
+    </script>
+</body>
+</html>
